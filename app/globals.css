@@ -1,8 +1,7 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-  font-family: "Inter", Arial, sans-serif;
+  font-family: var(--font-geist-sans), Arial, sans-serif;
   color: #171a24;
   background: #f7f8fc;
   font-synthesis: none;
@@ -76,7 +75,7 @@ button:focus-visible {
 .nav-label,
 .eyebrow {
   margin: 0 0 10px 12px;
-  color: #9297a7;
+  color: #6b7085;
   font-size: 11px;
   font-weight: 700;
   letter-spacing: 0.55px;
@@ -161,7 +160,7 @@ button:focus-visible {
 
 .profile small {
   margin-top: 2px;
-  color: #9297a7;
+  color: #6b7085;
   font-size: 11px;
 }
 
@@ -185,7 +184,7 @@ button:focus-visible {
 .breadcrumb,
 .edited {
   margin: 0;
-  color: #9297a7;
+  color: #6b7085;
 }
 
 .breadcrumb {
@@ -378,52 +377,6 @@ button:focus-visible {
   margin: 0;
 }
 
-.document-copy .highlight {
-  width: fit-content;
-  margin-left: -3px;
-  padding: 2px 3px;
-  border-radius: 5px;
-  background: #fff3c7;
-}
-
-.document-copy > p:nth-of-type(4) {
-  margin-top: 11px;
-}
-
-.document-copy h2:nth-of-type(2) {
-  margin-top: 44px;
-}
-
-.selection-wrap {
-  position: relative;
-  margin-top: 30px;
-}
-
-.selected-text {
-  max-width: 544px;
-  min-height: 58px;
-  padding: 8px 9px;
-  border-radius: 7px;
-  color: #343846;
-  background: #eef0ff;
-}
-
-.ask-button {
-  position: absolute;
-  top: -10px;
-  right: 0;
-  z-index: 2;
-  height: 30px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 8px;
-  color: #fff;
-  background: #171a24;
-  cursor: pointer;
-  font-size: 11px;
-  font-weight: 600;
-}
-
 .ai-header {
   display: flex;
   height: 52px;
@@ -459,7 +412,7 @@ button:focus-visible {
 
 .ai-header p {
   margin-top: 3px;
-  color: #9297a7;
+  color: #6b7085;
   font-size: 11px;
 }
 
@@ -573,6 +526,18 @@ button:focus-visible {
   background: #f7f8fc;
 }
 
+.title-input {
+  margin: 6px 0 2px;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.5px;
+  width: 100%;
+  outline: none;
+}
+
 footer {
   display: flex;
   justify-content: space-between;
@@ -611,6 +576,9 @@ footer {
 }
 
 @media (max-width: 900px) {
+  body { overflow: auto; height: auto; }
+  .app-shell { height: auto; overflow: visible; }
+  
   .sidebar {
     position: static;
     width: 190px;
@@ -621,6 +589,8 @@ footer {
     width: calc(100% - 190px);
     margin-left: 0;
     padding: 24px 16px;
+    height: auto;
+    overflow: visible;
   }
 
   .content-grid {
@@ -696,10 +666,6 @@ footer {
 
   .document-copy {
     padding-inline: 5px;
-  }
-
-  .ask-button {
-    top: -36px;
   }
 
   footer {

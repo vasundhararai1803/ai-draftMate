@@ -49,8 +49,21 @@ const initialDocuments: DocumentItem[] = [
   }
 ];
 
+const MAIN_ACTIONS = [
+  { id: "summarize", label: "Summarize" },
+  { id: "simplify", label: "Explain simply" },
+  { id: "fix", label: "Fix tone" },
+];
+
+const QUICK_ACTIONS = [
+  { id: "shorter", label: "Make shorter" },
+  { id: "friendly", label: "More friendly" },
+  { id: "formal", label: "More formal" },
+];
+
 export default function Editor() {
   const [docs, setDocs] = useState<DocumentItem[]>(initialDocuments);
+  const [loaded, setLoaded] = useState(false);
   const [activeDocId, setActiveDocId] = useState<string>("doc-1");
   const [activeNav, setActiveNav] = useState<string>("All documents");
   const [activeAction, setActiveAction] = useState<string>("Explain simply");
@@ -61,22 +74,35 @@ export default function Editor() {
   const editorRef = useRef<HTMLDivElement>(null);
   const documentCopyRef = useRef<HTMLElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
-  const lastTargetTextRef = useRef<string>("");
   const lastActionRef = useRef<string>("simplify");
+  const usedSelectionRef = useRef(false);
+  const noticeTimer = useRef<number | undefined>(undefined);
 
   const currentDoc = docs.find((d) => d.id === activeDocId) || docs[0];
 
   const { completion, complete, isLoading, stop, error } = useCompletion({
     api: '/api/ai',
     streamProtocol: 'text',
-    onError: (err) => {
-      showNotice("AI Error: " + (err.message || "Failed to generate"));
-    }
   });
 
+  // FIX 11: Don't lose documents on refresh
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("draftmate-docs");
+      if (saved) setDocs(JSON.parse(saved));
+    } catch {}
+    setLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (loaded) localStorage.setItem("draftmate-docs", JSON.stringify(docs));
+  }, [docs, loaded]);
+
+  // FIX 14: Clean up the toast timer
   const showNotice = (message: string) => {
     setNotice(message);
-    window.setTimeout(() => setNotice(""), 2500);
+    window.clearTimeout(noticeTimer.current);
+    noticeTimer.current = window.setTimeout(() => setNotice(""), 2500);
   };
 
   // Recalculate word count from editor content
@@ -90,11 +116,13 @@ export default function Editor() {
 
   // Update editor HTML when switching documents
   useEffect(() => {
+    if (!loaded) return;
     if (documentCopyRef.current && currentDoc) {
       documentCopyRef.current.innerHTML = currentDoc.content;
       updateWordCount();
     }
-  }, [activeDocId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDocId, loaded]);
 
   // Track user text selection inside the editor
   const handleSelectionChange = () => {
@@ -119,8 +147,9 @@ export default function Editor() {
     }
   };
 
-  const runAction = async (actionLabel: string) => {
-    setActiveAction(actionLabel);
+  // FIX 12: Replace fragile label matching with action IDs
+  const runAction = async (actionId: string, label: string) => {
+    setActiveAction(label);
 
     // Determine target text from active selection or full document
     let targetText = "";
@@ -128,11 +157,15 @@ export default function Editor() {
 
     if (selection) {
       targetText = selection;
+      usedSelectionRef.current = true;
       if (window.getSelection()?.rangeCount) {
         savedRangeRef.current = window.getSelection()!.getRangeAt(0).cloneRange();
       }
-    } else if (documentCopyRef.current) {
-      targetText = documentCopyRef.current.innerText.trim();
+    } else {
+      usedSelectionRef.current = false;
+      if (documentCopyRef.current) {
+        targetText = documentCopyRef.current.innerText.trim();
+      }
     }
 
     if (!targetText) {
@@ -140,35 +173,24 @@ export default function Editor() {
       return;
     }
 
-    let aiAction = "improve";
-    const labelLower = actionLabel.toLowerCase();
-
-    if (labelLower.includes("summarize")) aiAction = "summarize";
-    else if (labelLower.includes("explain") || labelLower.includes("simply") || labelLower.includes("ask")) aiAction = "simplify";
-    else if (labelLower.includes("tone") || labelLower.includes("fix")) aiAction = "fix";
-    else if (labelLower.includes("shorter")) aiAction = "shorter";
-    else if (labelLower.includes("friendly")) aiAction = "friendly";
-    else if (labelLower.includes("formal")) aiAction = "formal";
-    else if (labelLower.includes("improve")) aiAction = "improve";
-
-    lastTargetTextRef.current = targetText;
-    lastActionRef.current = aiAction;
+    lastActionRef.current = actionId;
 
     try {
-      await complete(targetText, { body: { action: aiAction } });
+      await complete(targetText, { body: { action: actionId } });
     } catch (err) {
       console.error(err);
     }
   };
 
   const handleRegenerate = () => {
-    if (lastTargetTextRef.current) {
-      complete(lastTargetTextRef.current, { body: { action: lastActionRef.current } });
+    if (lastActionRef.current) {
+      complete("", { body: { action: lastActionRef.current } });
     } else {
-      runAction(activeAction);
+      runAction(lastActionRef.current, activeAction);
     }
   };
 
+  // FIX 13: Stop "Improve all" from duplicating document
   const useSuggestion = () => {
     if (!completion) return;
 
@@ -197,13 +219,19 @@ export default function Editor() {
       }
     }
 
-    // Append to document if no specific range selected
+    // Append or replace based on action
     if (documentCopyRef.current) {
-      const p = document.createElement("p");
-      p.textContent = completion;
-      documentCopyRef.current.appendChild(p);
+      const lines = completion.split("\n").filter((l) => l.trim());
+      const paragraphs = lines.map((line) => {
+        const p = document.createElement("p");
+        p.textContent = line;
+        return p;
+      });
+      const replaceAll = ["fix", "improve", "shorter", "friendly", "formal"].includes(lastActionRef.current);
+      if (replaceAll) documentCopyRef.current.replaceChildren(...paragraphs);
+      else documentCopyRef.current.append(...paragraphs);
       handleEditorInput();
-      showNotice("Suggestion added to draft");
+      showNotice(replaceAll ? "Document updated" : "Suggestion added to draft");
     }
   };
 
@@ -242,6 +270,7 @@ export default function Editor() {
         <div className="brand-row">
           <span className="brand">DraftMate</span>
           <button
+            type="button"
             className="new-document"
             aria-label="Create new document"
             title="Create new document"
@@ -255,6 +284,7 @@ export default function Editor() {
           <p className="nav-label">Workspace</p>
           {["All documents", "Recent", "Favorites"].map((item) => (
             <button
+              type="button"
               className={`nav-item ${activeNav === item ? "active" : ""}`}
               key={item}
               onClick={() => setActiveNav(item)}
@@ -266,6 +296,7 @@ export default function Editor() {
           <p className="nav-label documents-label">Documents</p>
           {filteredDocs.map((item) => (
             <button
+              type="button"
               className={`nav-item document-item ${item.id === activeDocId ? "current-document" : ""}`}
               key={item.id}
               onClick={() => setActiveDocId(item.id)}
@@ -278,8 +309,8 @@ export default function Editor() {
         <div className="profile">
           <span className="avatar">VR</span>
           <span>
-            <strong>Vasundhara Rai</strong>
-            <small>Free plan</small>
+            <strong>Your name</strong>
+            <small>Local workspace</small>
           </span>
         </div>
       </aside>
@@ -288,8 +319,24 @@ export default function Editor() {
         <header className="page-header" style={{ minHeight: 'auto', marginBottom: '24px' }}>
           <div>
             <p className="breadcrumb">My documents / {currentDoc?.title}</p>
-            <h1>{currentDoc?.title}</h1>
-            <p className="edited">Edited just now</p>
+            <input
+              className="title-input"
+              value={currentDoc?.title ?? ""}
+              aria-label="Document title"
+              onChange={(e) =>
+                setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, title: e.target.value } : d)))
+              }
+            />
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() =>
+                setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, isFavorite: !d.isFavorite } : d)))
+              }
+            >
+              {currentDoc?.isFavorite ? "★ Favorited" : "☆ Favorite"}
+            </button>
+            <p className="edited">Saved locally</p>
           </div>
         </header>
 
@@ -365,6 +412,9 @@ export default function Editor() {
               className="editor-body"
               contentEditable
               suppressContentEditableWarning
+              role="textbox"
+              aria-multiline="true"
+              aria-label="Document editor"
               onMouseUp={handleSelectionChange}
               onKeyUp={handleSelectionChange}
               onInput={handleEditorInput}
@@ -372,15 +422,15 @@ export default function Editor() {
               <div className="ai-actions" contentEditable={false}>
                 <span className="eyebrow purple">AI actions</span>
                 <div className="action-buttons">
-                  {["Summarize", "Explain simply", "Fix tone"].map((action) => (
+                  {MAIN_ACTIONS.map((action) => (
                     <button
-                      key={action}
+                      key={action.id}
                       type="button"
                       disabled={isLoading}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => runAction(action)}
+                      onClick={() => runAction(action.id, action.label)}
                     >
-                      {action}
+                      {action.label}
                     </button>
                   ))}
                   <button
@@ -388,7 +438,7 @@ export default function Editor() {
                     className="improve"
                     disabled={isLoading}
                     onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => runAction("Improve all")}
+                    onClick={() => runAction("improve", "Improve all")}
                   >
                     <span aria-hidden="true">✦</span> Improve all
                   </button>
@@ -406,7 +456,7 @@ export default function Editor() {
                 <h2>DraftMate AI</h2>
                 <p>Writing assistant</p>
               </div>
-              <span className={`online ${isLoading ? 'animate-pulse' : ''}`} aria-label="Online" title="Ollama llama3.2 connected" />
+              <span className={`online ${isLoading ? 'animate-pulse' : ''}`} aria-label="Online" title="AI assistant" />
             </div>
 
             <div className="ai-content">
@@ -437,17 +487,17 @@ export default function Editor() {
                 )}
               </div>
               
-              <div className="suggestion">
-                {isLoading && !completion ? (
-                  <p style={{ color: '#9297a7', fontStyle: 'italic', margin: 0 }}>Thinking with Ollama...</p>
+              <div className="suggestion" aria-live="polite">
+                {error ? (
+                  <p style={{ color: '#dc2626', margin: 0 }}>Error: {error.message || "Failed to reach AI service"}</p>
+                ) : isLoading && !completion ? (
+                  <p style={{ color: '#6b7085', fontStyle: 'italic', margin: 0 }}>Thinking with Ollama...</p>
                 ) : completion ? (
                   completion.split('\n').map((paragraph, i) => (
                     paragraph.trim() ? <p key={i}>{paragraph}</p> : <br key={i} />
                   ))
-                ) : error ? (
-                  <p style={{ color: '#dc2626', margin: 0 }}>Error: {error.message || "Failed to reach AI service"}</p>
                 ) : (
-                  <p style={{ color: '#9297a7', fontStyle: 'italic', margin: 0 }}>Highlight text in the editor or click an AI action to get instant suggestions.</p>
+                  <p style={{ color: '#6b7085', fontStyle: 'italic', margin: 0 }}>Highlight text in the editor or click an AI action to get instant suggestions.</p>
                 )}
               </div>
 
@@ -463,7 +513,7 @@ export default function Editor() {
                 <button
                   type="button"
                   className="button secondary"
-                  disabled={isLoading || (!completion && !lastTargetTextRef.current)}
+                  disabled={isLoading || !completion}
                   onClick={handleRegenerate}
                 >
                   Regenerate
@@ -473,15 +523,15 @@ export default function Editor() {
               <div className="quick-prompts">
                 <span className="eyebrow">Quick prompts</span>
                 <div>
-                  {["Make shorter", "More friendly", "More formal"].map((prompt) => (
+                  {QUICK_ACTIONS.map((action) => (
                     <button
-                      key={prompt}
+                      key={action.id}
                       type="button"
                       disabled={isLoading}
                       onMouseDown={(e) => e.preventDefault()}
-                      onClick={() => runAction(prompt)}
+                      onClick={() => runAction(action.id, action.label)}
                     >
-                      {prompt}
+                      {action.label}
                     </button>
                   ))}
                 </div>

@@ -1,5 +1,5 @@
 {
-  "name": "my-ai-editor",
+  "name": "draftmate",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -9,15 +9,12 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@ai-sdk/google": "^4.0.92",
     "@ai-sdk/react": "^4.0.137",
     "ai": "^7.0.134",
     "ai-sdk-ollama": "^4.4.0",
     "next": "16.4.0",
-    "ollama-ai-provider": "^1.2.0",
     "react": "19.3.0",
-    "react-dom": "19.3.0",
-    "zod": "^3.25.76"
+    "react-dom": "19.3.0"
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
