@@ -82,7 +82,7 @@ export default function Editor() {
   const currentDoc = docs.find((d) => d.id === activeDocId) || docs[0];
 
   const { completion, complete, isLoading, stop, error } = useCompletion({
-    api: '/api/ai',
+    api: `${typeof window !== 'undefined' ? window.location.origin : ''}/api/ai`,
     streamProtocol: 'text',
     body: {},
     headers: {
