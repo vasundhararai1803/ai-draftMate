@@ -36,6 +36,7 @@ export async function POST(req: Request) {
   try {
     // Debug: Check if API key is available
     const apiKey = process.env.GROQ_API_KEY;
+    console.log('API Key present:', !!apiKey);
     if (!apiKey || apiKey.trim() === '') {
       console.error('GROQ_API_KEY is not set or is empty');
       return new Response("AI service not configured.", { status: 500 });
@@ -47,6 +48,7 @@ export async function POST(req: Request) {
     }
     
     const { prompt, action } = body as { prompt?: unknown; action?: unknown };
+    console.log('Request action:', action, 'prompt length:', (prompt as string)?.length);
 
     // Reject bad input
     if (typeof action !== "string" || !Object.hasOwn(promptMap, action)) {
@@ -60,18 +62,45 @@ export async function POST(req: Request) {
     const instruction = promptMap[action];
     const fullPrompt = `${instruction}\n\n<text>\n${prompt.trim()}\n</text>`;
 
-    console.log('Starting streamText with action:', action);
+    console.log('Starting streamText with model: openai/gpt-oss-120b');
     const result = streamText({
-      model: groq('llama-3.1-70b-versatile'),
+      model: groq('openai/gpt-oss-120b'),
       system: systemPrompt,
       prompt: fullPrompt,
       abortSignal: req.signal,
       maxOutputTokens: 1024,
     });
 
-    const stream = result.toTextStreamResponse();
-    console.log('Stream created successfully');
-    return stream;
+    console.log('streamText initialized');
+    
+    // Get the text stream
+    let responseText = '';
+    const textStream = result.textStream;
+    
+    // Create a readable stream from the text stream
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        try {
+          for await (const chunk of textStream) {
+            console.log('Chunk received:', chunk.substring(0, 50));
+            responseText += chunk;
+            controller.enqueue(encoder.encode(chunk));
+          }
+          controller.close();
+          console.log('Stream complete, total length:', responseText.length);
+        } catch (error) {
+          console.error('Stream error:', error);
+          controller.error(error);
+        }
+      },
+    });
+
+    return new Response(stream, {
+      headers: {
+        'Content-Type': 'text/plain; charset=utf-8',
+      },
+    });
   } catch (error: any) {
     console.error("AI API Error:", error?.message || error);
     return new Response("The AI service is unavailable.", { status: 500 });
