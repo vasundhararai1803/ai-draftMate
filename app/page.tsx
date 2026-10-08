@@ -84,10 +84,6 @@ export default function Editor() {
   const { completion, complete, isLoading, stop, error } = useCompletion({
     api: `${typeof window !== 'undefined' ? window.location.origin : ''}/api/ai`,
     streamProtocol: 'text',
-    body: {},
-    headers: {
-      'Content-Type': 'application/json',
-    },
     onError: (err: any) => {
       console.error('Completion error:', err);
       showNotice('AI Error: ' + (err?.message || 'Failed to generate'));

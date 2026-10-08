@@ -60,6 +60,7 @@ export async function POST(req: Request) {
     const instruction = promptMap[action];
     const fullPrompt = `${instruction}\n\n<text>\n${prompt.trim()}\n</text>`;
 
+    console.log('Starting streamText with action:', action);
     const result = streamText({
       model: groq('llama-3.1-70b-versatile'),
       system: systemPrompt,
@@ -68,7 +69,9 @@ export async function POST(req: Request) {
       maxOutputTokens: 1024,
     });
 
-    return result.toTextStreamResponse();
+    const stream = result.toTextStreamResponse();
+    console.log('Stream created successfully');
+    return stream;
   } catch (error: any) {
     console.error("AI API Error:", error?.message || error);
     return new Response("The AI service is unavailable.", { status: 500 });
