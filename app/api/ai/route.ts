@@ -1,8 +1,8 @@
 import { streamText } from 'ai';
-import { createOllama } from 'ai-sdk-ollama';
+import { createGroq } from '@ai-sdk/groq';
 
-const ollama = createOllama({
-  baseURL: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
+const groq = createGroq({
+  apiKey: process.env.GROQ_API_KEY,
 });
 
 const systemPrompt = `You are DraftMate AI, an expert writing assistant embedded inside a smart text editor.
@@ -31,6 +31,11 @@ const promptMap: Record<string, string> = {
 
 export async function POST(req: Request) {
   try {
+    // Validate API key
+    if (!process.env.GROQ_API_KEY) {
+      return new Response("AI service not configured.", { status: 500 });
+    }
+
     const body = await req.json().catch(() => null);
     if (!body || typeof body !== "object") {
       return new Response("Invalid request.", { status: 400 });
@@ -49,7 +54,7 @@ export async function POST(req: Request) {
     const fullPrompt = `${instruction}\n\n<text>\n${prompt.trim()}\n</text>`;
 
     const result = streamText({
-      model: ollama(process.env.AI_MODEL ?? 'llama3.2'),
+      model: groq('mixtral-8x7b-32768'),
       system: systemPrompt,
       prompt: fullPrompt,
       abortSignal: req.signal,
@@ -59,6 +64,6 @@ export async function POST(req: Request) {
     return result.toTextStreamResponse();
   } catch (error) {
     console.error("AI API Error:", error);
-    return new Response("The AI service is unavailable. Is Ollama running?", { status: 500 });
+    return new Response("The AI service is unavailable.", { status: 500 });
   }
 }

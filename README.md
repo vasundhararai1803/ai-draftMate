@@ -1,6 +1,6 @@
 # DraftMate AI Editor
 
-An intelligent writing assistant that integrates AI-powered text editing capabilities directly into your editor. DraftMate helps you refine, simplify, and improve your writing with precision.
+An intelligent writing assistant that integrates AI-powered text editing capabilities directly into your editor. DraftMate helps you refine, simplify, and improve your writing with precision. Powered by Groq's fast inference API.
 
 ## Features
 
@@ -14,11 +14,7 @@ An intelligent writing assistant that integrates AI-powered text editing capabil
 
 ## Prerequisites
 
-Before getting started, make sure you have:
-
-1. **Ollama installed** — Download from [https://ollama.com](https://ollama.com)
-2. **llama3.2 model** — Run: `ollama pull llama3.2`
-3. **Ollama running** — Start the server: `ollama serve`
+1. **Groq API Key** — Sign up at [https://console.groq.com](https://console.groq.com) and get your free API key
 
 ## Getting Started
 
@@ -28,6 +24,9 @@ npm install
 
 # Copy environment template
 cp .env.example .env.local
+
+# Add your Groq API key to .env.local
+# GROQ_API_KEY=your_api_key_here
 
 # Start development server
 npm run dev
@@ -40,15 +39,14 @@ Open [http://localhost:3000](http://localhost:3000) to access the editor.
 DraftMate is configured via environment variables in `.env.local`:
 
 ```env
-OLLAMA_BASE_URL=http://localhost:11434  # Ollama server address
-AI_MODEL=llama3.2                        # LLM model to use
+GROQ_API_KEY=your_groq_api_key_here
 ```
 
-Both have sensible defaults, so you don't need to set them unless your Ollama server is running elsewhere.
+Get your API key from [Groq Console](https://console.groq.com). The free tier includes generous rate limits.
 
 ## API
 
-**POST** `/api/ai`
+**Endpoint:** `POST /api/ai`
 
 Request body:
 ```json
@@ -62,8 +60,9 @@ The request is validated server-side:
 - `action` must be one of the 7 allowed values
 - `prompt` must be a non-empty string, max 8000 characters
 - Invalid requests return 400 with a clear error message
+- API key is stored server-side only, never exposed to client
 
-Response: Streamed text from the LLM.
+Response: Streamed text from the Groq API.
 
 ## Features
 
@@ -91,18 +90,17 @@ Response: Streamed text from the LLM.
 
 ## Troubleshooting
 
-### "The AI service is unavailable. Is Ollama running?"
+### "The AI service is unavailable."
 
-1. Start Ollama: `ollama serve`
-2. Verify `OLLAMA_BASE_URL` in `.env.local` matches your Ollama server
-3. Check that the model is installed: `ollama list`
+1. Verify your Groq API key is set in `.env.local`
+2. Check that the key is valid at [Groq Console](https://console.groq.com)
+3. Ensure you have API calls remaining (check quota)
 
 ### Model takes too long to respond
 
 - Reduce the text length (max 8000 characters)
-- Check your system resources (CPU/RAM)
-- Try a faster model: `ollama pull phi` (smaller, faster)
-- Edit `.env.local` to set `AI_MODEL=phi`
+- Try again after a moment (rate limits)
+- Check Groq Console for API usage
 
 ### Documents disappeared after refresh
 
@@ -117,18 +115,33 @@ Use export or screenshots for important work, or store content elsewhere.
 - **Framework**: Next.js 16 with React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4 with Turbopack
-- **AI**: Ollama (local LLM inference)
+- **AI**: Groq API (mixtral-8x7b-32768 model)
 - **Client State**: React hooks with localStorage persistence
 - **Validation**: Simple type-safe checks (no external validators)
 
 ## Data and Privacy
 
 ✅ **Your text stays private:**
-- Text is sent **only** to the Ollama server specified in `OLLAMA_BASE_URL`
-- Default is `http://localhost:11434` (your local machine)
-- No data sent to external services
+- Text is sent **only** to Groq's API servers
+- API key is stored server-side only in `.env.local` (never exposed to client)
 - Documents are stored in your browser's localStorage
-- No cloud sync or telemetry
+- No local Ollama server required
+- No data sent to other external services
+
+## Deployment
+
+DraftMate works on any Node.js hosting platform (Vercel, Railway, Heroku, etc.):
+
+1. Set `GROQ_API_KEY` in your platform's environment variables
+2. Deploy as usual
+3. The API key is automatically used on the server
+
+Example for Vercel:
+```bash
+vercel env add GROQ_API_KEY
+# Paste your Groq API key when prompted
+vercel deploy
+```
 
 ## Development
 
@@ -152,3 +165,4 @@ npm run start
 - Prototype pollution attacks are blocked (e.g., `action: "constructor"`)
 - Text is wrapped in delimiters to prevent accidental instruction following
 - The system prompt explicitly instructs the model to ignore nested instructions
+- API key is stored server-side only, never sent to the client
