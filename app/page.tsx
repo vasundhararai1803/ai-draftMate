@@ -6,17 +6,17 @@ import { useCompletion } from '@ai-sdk/react';
 interface DocumentItem {
   id: string;
   title: string;
-  category: 'all' | 'recent' | 'favorites';
   isFavorite?: boolean;
   content: string;
+  updatedAt: number;
 }
 
 const initialDocuments: DocumentItem[] = [
   {
     id: "doc-1",
     title: "Product launch notes",
-    category: "recent",
     isFavorite: true,
+    updatedAt: Date.now() - 1 * 24 * 60 * 60 * 1000, // 1 day ago
     content: `<h2>Why we built DraftMate</h2>
 <p>Writing is often interrupted by the tools we use to improve it.</p>
 <p>You write in one app, copy your text, open an AI assistant, paste it, explain what you need, and then bring the result back.</p>
@@ -28,8 +28,8 @@ const initialDocuments: DocumentItem[] = [
   {
     id: "doc-2",
     title: "Blog draft",
-    category: "recent",
     isFavorite: false,
+    updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000, // 2 days ago
     content: `<h2>Unlocking Focus in Modern Writing</h2>
 <p>Deep work is becoming a rare superpower in today's hyper-connected environment.</p>
 <p>Every notification, window switch, and external AI tab fragments our train of thought.</p>
@@ -39,8 +39,8 @@ const initialDocuments: DocumentItem[] = [
   {
     id: "doc-3",
     title: "Essay — AI in education",
-    category: "all",
     isFavorite: true,
+    updatedAt: Date.now() - 20 * 24 * 60 * 60 * 1000, // 20 days ago
     content: `<h2>The Evolution of Interactive Learning</h2>
 <p>Artificial intelligence is shifting education from passive consumption to active inquiry.</p>
 <p>Rather than replacing critical thinking, intelligent assistants act as personalized sounding boards.</p>
@@ -75,6 +75,7 @@ export default function Editor() {
   const documentCopyRef = useRef<HTMLElement>(null);
   const savedRangeRef = useRef<Range | null>(null);
   const lastActionRef = useRef<string>("simplify");
+  const lastTargetTextRef = useRef<string>("");
   const usedSelectionRef = useRef(false);
   const noticeTimer = useRef<number | undefined>(undefined);
 
@@ -89,7 +90,15 @@ export default function Editor() {
   useEffect(() => {
     try {
       const saved = localStorage.getItem("draftmate-docs");
-      if (saved) setDocs(JSON.parse(saved));
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Ensure old docs have updatedAt
+        const withTimestamps = parsed.map((doc: DocumentItem) => ({
+          ...doc,
+          updatedAt: doc.updatedAt ?? Date.now(),
+        }));
+        setDocs(withTimestamps);
+      }
     } catch {}
     setLoaded(true);
   }, []);
@@ -142,7 +151,7 @@ export default function Editor() {
     if (documentCopyRef.current) {
       const newHtml = documentCopyRef.current.innerHTML;
       setDocs((prev) =>
-        prev.map((d) => (d.id === activeDocId ? { ...d, content: newHtml } : d))
+        prev.map((d) => (d.id === activeDocId ? { ...d, content: newHtml, updatedAt: Date.now() } : d))
       );
     }
   };
@@ -173,6 +182,7 @@ export default function Editor() {
       return;
     }
 
+    lastTargetTextRef.current = targetText;
     lastActionRef.current = actionId;
 
     try {
@@ -183,10 +193,8 @@ export default function Editor() {
   };
 
   const handleRegenerate = () => {
-    if (lastActionRef.current) {
-      complete("", { body: { action: lastActionRef.current } });
-    } else {
-      runAction(lastActionRef.current, activeAction);
+    if (lastTargetTextRef.current) {
+      complete(lastTargetTextRef.current, { body: { action: lastActionRef.current } });
     }
   };
 
@@ -249,8 +257,8 @@ export default function Editor() {
     const newDoc: DocumentItem = {
       id: newId,
       title: "Untitled draft",
-      category: "recent",
       isFavorite: false,
+      updatedAt: Date.now(),
       content: `<h2>Untitled draft</h2><p>Start writing here, or select an AI action to help draft your ideas...</p>`
     };
     setDocs((prev) => [newDoc, ...prev]);
@@ -258,11 +266,14 @@ export default function Editor() {
     showNotice("New document created");
   };
 
-  const filteredDocs = docs.filter((doc) => {
-    if (activeNav === "Recent") return doc.category === "recent";
-    if (activeNav === "Favorites") return doc.isFavorite;
-    return true;
-  });
+  const filteredDocs = docs
+    .map((doc) => doc)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+    .filter((doc) => {
+      if (activeNav === "Recent") return Date.now() - doc.updatedAt <= 7 * 24 * 60 * 60 * 1000;
+      if (activeNav === "Favorites") return doc.isFavorite;
+      return true;
+    });
 
   return (
     <div className="app-shell">
@@ -324,14 +335,14 @@ export default function Editor() {
               value={currentDoc?.title ?? ""}
               aria-label="Document title"
               onChange={(e) =>
-                setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, title: e.target.value } : d)))
+                setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, title: e.target.value, updatedAt: Date.now() } : d)))
               }
             />
             <button
               type="button"
               className="button secondary"
               onClick={() =>
-                setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, isFavorite: !d.isFavorite } : d)))
+                setDocs((prev) => prev.map((d) => (d.id === activeDocId ? { ...d, isFavorite: !d.isFavorite, updatedAt: Date.now() } : d)))
               }
             >
               {currentDoc?.isFavorite ? "★ Favorited" : "☆ Favorite"}

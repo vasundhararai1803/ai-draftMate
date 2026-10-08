@@ -1,7 +1,9 @@
 import { streamText } from 'ai';
 import { createOllama } from 'ai-sdk-ollama';
 
-const ollama = createOllama();
+const ollama = createOllama({
+  baseURL: process.env.OLLAMA_BASE_URL ?? 'http://localhost:11434',
+});
 
 const systemPrompt = `You are DraftMate AI, an expert writing assistant embedded inside a smart text editor.
 CRITICAL INSTRUCTIONS:
@@ -29,10 +31,14 @@ const promptMap: Record<string, string> = {
 
 export async function POST(req: Request) {
   try {
-    const { prompt, action } = await req.json();
+    const body = await req.json().catch(() => null);
+    if (!body || typeof body !== "object") {
+      return new Response("Invalid request.", { status: 400 });
+    }
+    const { prompt, action } = body as { prompt?: unknown; action?: unknown };
 
     // Reject bad input
-    if (!(action in promptMap)) {
+    if (typeof action !== "string" || !Object.hasOwn(promptMap, action)) {
       return new Response("Invalid action.", { status: 400 });
     }
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 8000) {
@@ -43,7 +49,7 @@ export async function POST(req: Request) {
     const fullPrompt = `${instruction}\n\n<text>\n${prompt.trim()}\n</text>`;
 
     const result = streamText({
-      model: ollama('llama3.2'),
+      model: ollama(process.env.AI_MODEL ?? 'llama3.2'),
       system: systemPrompt,
       prompt: fullPrompt,
       abortSignal: req.signal,
