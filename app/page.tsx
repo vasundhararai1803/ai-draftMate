@@ -84,6 +84,14 @@ export default function Editor() {
   const { completion, complete, isLoading, stop, error } = useCompletion({
     api: '/api/ai',
     streamProtocol: 'text',
+    body: {},
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    onError: (err: any) => {
+      console.error('Completion error:', err);
+      showNotice('AI Error: ' + (err?.message || 'Failed to generate'));
+    },
   });
 
   // FIX 11: Don't lose documents on refresh
@@ -502,7 +510,7 @@ export default function Editor() {
                 {error ? (
                   <p style={{ color: '#dc2626', margin: 0 }}>Error: {error.message || "Failed to reach AI service"}</p>
                 ) : isLoading && !completion ? (
-                  <p style={{ color: '#6b7085', fontStyle: 'italic', margin: 0 }}>Thinking with Ollama...</p>
+                  <p style={{ color: '#6b7085', fontStyle: 'italic', margin: 0 }}>Thinking...</p>
                 ) : completion ? (
                   completion.split('\n').map((paragraph, i) => (
                     paragraph.trim() ? <p key={i}>{paragraph}</p> : <br key={i} />
