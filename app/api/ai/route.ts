@@ -61,7 +61,7 @@ export async function POST(req: Request) {
     const fullPrompt = `${instruction}\n\n<text>\n${prompt.trim()}\n</text>`;
 
     const result = streamText({
-      model: groq('mixtral-8x7b-32768'),
+      model: groq('llama-3.1-70b-versatile'),
       system: systemPrompt,
       prompt: fullPrompt,
       abortSignal: req.signal,

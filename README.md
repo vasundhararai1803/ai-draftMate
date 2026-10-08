@@ -115,7 +115,7 @@ Use export or screenshots for important work, or store content elsewhere.
 - **Framework**: Next.js 16 with React 19
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS v4 with Turbopack
-- **AI**: Groq API (mixtral-8x7b-32768 model)
+- **AI**: Groq API (llama-3.1-70b-versatile model)
 - **Client State**: React hooks with localStorage persistence
 - **Validation**: Simple type-safe checks (no external validators)
 
