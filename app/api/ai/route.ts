@@ -1,8 +1,11 @@
 import { streamText } from 'ai';
 import { createGroq } from '@ai-sdk/groq';
 
+// Initialize Groq with API key
+// In Vercel: Set GROQ_API_KEY env variable
+// Locally: Set in .env.local
 const groq = createGroq({
-  apiKey: process.env.GROQ_API_KEY,
+  apiKey: process.env.GROQ_API_KEY || '',
 });
 
 const systemPrompt = `You are DraftMate AI, an expert writing assistant embedded inside a smart text editor.
@@ -31,8 +34,10 @@ const promptMap: Record<string, string> = {
 
 export async function POST(req: Request) {
   try {
-    // Validate API key
-    if (!process.env.GROQ_API_KEY) {
+    // Debug: Check if API key is available
+    const apiKey = process.env.GROQ_API_KEY;
+    if (!apiKey || apiKey.trim() === '') {
+      console.error('GROQ_API_KEY is not set or is empty');
       return new Response("AI service not configured.", { status: 500 });
     }
 
@@ -40,12 +45,14 @@ export async function POST(req: Request) {
     if (!body || typeof body !== "object") {
       return new Response("Invalid request.", { status: 400 });
     }
+    
     const { prompt, action } = body as { prompt?: unknown; action?: unknown };
 
     // Reject bad input
     if (typeof action !== "string" || !Object.hasOwn(promptMap, action)) {
       return new Response("Invalid action.", { status: 400 });
     }
+    
     if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 8000) {
       return new Response("Text is empty or too long (max 8000 characters).", { status: 400 });
     }
@@ -62,8 +69,8 @@ export async function POST(req: Request) {
     });
 
     return result.toTextStreamResponse();
-  } catch (error) {
-    console.error("AI API Error:", error);
+  } catch (error: any) {
+    console.error("AI API Error:", error?.message || error);
     return new Response("The AI service is unavailable.", { status: 500 });
   }
 }
